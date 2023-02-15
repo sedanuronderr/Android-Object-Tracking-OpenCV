@@ -3,4 +3,6 @@
       package="org.opencv"
       android:versionCode="3480"
       android:versionName="3.4.8">
+
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>
