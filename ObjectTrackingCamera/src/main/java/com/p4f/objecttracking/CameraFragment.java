@@ -63,14 +63,12 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 
-import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.CvException;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
-import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -83,24 +81,11 @@ import org.opencv.tracking.TrackerMedianFlow;
 import org.opencv.tracking.TrackerTLD;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-public class CameraFragment extends Fragment implements ServiceConnection, SerialListener, View.OnTouchListener {
-
-    int i=0;
-    private Double[] h=new Double[20];
-    private Double[] k=new Double[20];
-    private double x=0;
-    private double y=0;
-
-    private CameraBridgeViewBase mOpenCvCameraView;
-    private boolean              mIsJavaCamera = true;
-    private Mat                    mRgba;
-
+public class CameraFragment extends Fragment implements ServiceConnection, SerialListener {
 
     final String TAG = "CameraFragment";
 
@@ -112,15 +97,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
         ORIENTATIONS.append(Surface.ROTATION_270, 180);
     }
-<<<<<<< HEAD
     enum Drawing{
-=======
-    private List<Rect> ListOfRect = new ArrayList<Rect>();
-
-
-
-    enum Drawing {
->>>>>>> 048d654d15caa23e23c7445d302462a412631c78
         DRAWING,
         TRACKING,
         CLEAR,
@@ -347,13 +324,10 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
 //            }
 
             image.close();
-
+            processing();
         }
     };
-    @Override
-    public boolean onTouch(View view, MotionEvent event) {
 
-<<<<<<< HEAD
     private void processing(){
         //TODO:do processing
         // Get the features for tracking
@@ -368,33 +342,6 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                 Log.d(TAG, ":minx " + Integer.toString(minX) + " " + Integer.toString(minY) );
 
 
-=======
-        if (mTargetLocked) {
-
-                double cols = mRgba.cols();
-                double rows = mRgba.rows();
-
-                double xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
-                double yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
-
-
-
-
-
-                h[i] = (double)(event).getX() - xOffset;
-                k[i] = (double)(event).getY() - yOffset;
-
-                h[i]=x;
-                k[i]=y;
-
-                Log.i(TAG, "Touch image coordinates: (" + h[i] + ", " + k[i] + ")");
-
-
-                i++;
-
-
-                mInitRectangle = new org.opencv.core.Rect2d((int) (x-100), (int) (y-100), (int) (x+100), (int) (y+100));
->>>>>>> 048d654d15caa23e23c7445d302462a412631c78
                 mImageGrabInit = new Mat();
                 mImageGrab.copyTo(mImageGrabInit);
 
@@ -416,11 +363,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                 mDrawing = Drawing.TRACKING;
 
                 //TODO: DEBUG
-<<<<<<< HEAD
                 org.opencv.core.Rect testRect = new org.opencv.core.Rect(minX, minY, 20, 20);
-=======
-                org.opencv.core.Rect testRect = new org.opencv.core.Rect((int) (x-100), (int) (y-100), (int) (x+100), (int) (y+100));
->>>>>>> 048d654d15caa23e23c7445d302462a412631c78
                 Mat roi = new Mat(mImageGrab, testRect);
                 Bitmap bmp = null;
                 Mat tmp = new Mat (roi.rows(), roi.cols(), CvType.CV_8U, new Scalar(4));
@@ -433,13 +376,8 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                     Log.d("Exception",e.getMessage());
                 }
 
-<<<<<<< HEAD
             }else{
                 org.opencv.core.Rect2d trackingRectangle = new org.opencv.core.Rect2d(0, 0, 1,1);
-=======
-
-                org.opencv.core.Rect2d trackingRectangle = new org.opencv.core.Rect2d((int) (x-100), (int) (y-100), (int) (x+100), (int) (y+100));
->>>>>>> 048d654d15caa23e23c7445d302462a412631c78
                 mTracker.update(mImageGrab, trackingRectangle);
 
 //                //TODO: DEBUG
@@ -478,27 +416,15 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                     sendBLE(dataBle);
 
                 }
-<<<<<<< HEAD
             }
         }else{
-=======
-
-        } else {
->>>>>>> 048d654d15caa23e23c7445d302462a412631c78
             if (mTracker != null) {
                 mTracker.clear();
                 mTracker = null;
             }
         }
         mProcessing = false;
-
-
-
-
-        return false;// don't need subsequent touch events
-
     }
-
 
     protected void createCameraPreview() {
         try {
@@ -562,7 +488,6 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                         }
                     }
             );
-
             mTrackingOverlay.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View view, MotionEvent event) {
