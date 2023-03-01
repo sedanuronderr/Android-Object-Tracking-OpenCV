@@ -3,6 +3,7 @@
     package="com.p4f.objecttracking">
 
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.CAMERA"/>
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

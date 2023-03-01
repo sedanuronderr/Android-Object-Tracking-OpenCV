@@ -63,12 +63,14 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 
+import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.CvException;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -81,25 +83,44 @@ import org.opencv.tracking.TrackerMedianFlow;
 import org.opencv.tracking.TrackerTLD;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-public class CameraFragment extends Fragment implements ServiceConnection, SerialListener {
+public class CameraFragment extends Fragment implements ServiceConnection, SerialListener, View.OnTouchListener {
+
+    int i=0;
+    private Double[] h=new Double[20];
+    private Double[] k=new Double[20];
+    private double x=0;
+    private double y=0;
+
+    private CameraBridgeViewBase mOpenCvCameraView;
+    private boolean              mIsJavaCamera = true;
+    private Mat                    mRgba;
+
 
     final String TAG = "CameraFragment";
 
     private TextureView mTextureView;
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
-
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
         ORIENTATIONS.append(Surface.ROTATION_270, 180);
     }
+<<<<<<< HEAD
+    enum Drawing{
+=======
+    private List<Rect> ListOfRect = new ArrayList<Rect>();
+
+
 
     enum Drawing {
+>>>>>>> 048d654d15caa23e23c7445d302462a412631c78
         DRAWING,
         TRACKING,
         CLEAR,
@@ -115,7 +136,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private Handler mBackgroundHandler;
     private HandlerThread mBackgroundThread;
-    private final Size CamResolution = new Size(1280, 720);
+    private final Size CamResolution = new Size(1280,720);
     private CameraCaptureSession mCaptureSession;
     /** this prevent the app from exiting before closing the camera. */
     private final Semaphore cameraOpenCloseLock = new Semaphore(1);
@@ -126,7 +147,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     private org.opencv.core.Rect2d mInitRectangle = null;
     private Point[] mPoints = new Point[2];
     private boolean mProcessing = false;
-    private Drawing mDrawing = Drawing.DRAWING;
+    private com.p4f.objecttracking.CameraFragment.Drawing mDrawing = com.p4f.objecttracking.CameraFragment.Drawing.DRAWING;
     private boolean mTargetLocked = false;
     private boolean mShowCordinate = false;
 
@@ -134,14 +155,13 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     private Menu mMenu;
 
     //bluetooth device
-    private enum Connected {False, Pending, True}
-
+    private enum Connected { False, Pending, True }
     private String newline = "\r\n";
     private TextView receiveText;
     private SerialSocket socket;
     private SerialService service;
     private boolean initialStart = true;
-    private Connected connected = Connected.False;
+    private com.p4f.objecttracking.CameraFragment.Connected connected = com.p4f.objecttracking.CameraFragment.Connected.False;
     private final int REQUEST_CONNECT_CODE = 68;
     private String mBluetoothDevAddr = "";
     private String mSelectedTracker = "TrackerMedianFlow";
@@ -153,17 +173,14 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             //open your camera here
             openCamera();
         }
-
         @Override
         public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
             // Transform you image captured size according to the surface width and height
         }
-
         @Override
         public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
             return false;
         }
-
         @Override
         public void onSurfaceTextureUpdated(SurfaceTexture surface) {
         }
@@ -212,7 +229,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     public void onDestroy() {
         Log.e(TAG, "onDestroy");
         closeCamera();
-        if (connected != Connected.False)
+        if (connected != com.p4f.objecttracking.CameraFragment.Connected.False)
             disconnectBLE();
         super.onDestroy();
 
@@ -238,12 +255,13 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     /*
      * UI
      */
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_camera, container, false);
         mTextureView = (TextureView) view.findViewById(R.id.texture);
-        mTrackingOverlay = (OverlayView) view.findViewById(R.id.tracking_overlay);
-        assert (mTextureView != null && mTrackingOverlay != null);
+        mTrackingOverlay = (OverlayView)view.findViewById(R.id.tracking_overlay);
+        assert ( mTextureView != null && mTrackingOverlay !=null) ;
         mTextureView.setSurfaceTextureListener(textureListener);
         return view;
     }
@@ -255,15 +273,13 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                 public void onCaptureProgressed(
                         final CameraCaptureSession session,
                         final CaptureRequest request,
-                        final CaptureResult partialResult) {
-                }
+                        final CaptureResult partialResult) {}
 
                 @Override
                 public void onCaptureCompleted(
                         final CameraCaptureSession session,
                         final CaptureRequest request,
-                        final TotalCaptureResult result) {
-                }
+                        final TotalCaptureResult result) {}
             };
 
 
@@ -276,13 +292,11 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             cameraDevice = camera;
             createCameraPreview();
         }
-
         @Override
         public void onDisconnected(CameraDevice camera) {
             cameraOpenCloseLock.release();
             cameraDevice.close();
         }
-
         @Override
         public void onError(CameraDevice camera, int error) {
             cameraOpenCloseLock.release();
@@ -291,15 +305,15 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
         }
     };
 
-    protected ImageReader.OnImageAvailableListener onImageAvailableListener = new ImageReader.OnImageAvailableListener() {
+    protected ImageReader.OnImageAvailableListener onImageAvailableListener = new ImageReader.OnImageAvailableListener(){
         @Override
-        public void onImageAvailable(ImageReader reader) {
+        public void onImageAvailable(ImageReader reader){
             final Image image = reader.acquireLatestImage();
             if (image == null) {
                 return;
             }
 
-            if (mProcessing) {
+            if(mProcessing){
                 image.close();
                 return;
             }
@@ -311,7 +325,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
 //            buffer.get(bytes);
 //            Bitmap bitmapImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
 
-            if (mTargetLocked) {
+            if(mTargetLocked) {
                 // image to byte array
                 ByteBuffer bb = image.getPlanes()[0].getBuffer();
                 byte[] data = new byte[bb.remaining()];
@@ -319,7 +333,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                 mImageGrab = Imgcodecs.imdecode(new MatOfByte(data), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
                 org.opencv.core.Core.transpose(mImageGrab, mImageGrab);
                 org.opencv.core.Core.flip(mImageGrab, mImageGrab, 1);
-                org.opencv.imgproc.Imgproc.resize(mImageGrab, mImageGrab, new org.opencv.core.Size(240, 320));
+                org.opencv.imgproc.Imgproc.resize(mImageGrab, mImageGrab, new org.opencv.core.Size(240,320));
             }
 //            Bitmap bmp = null;
 //            Mat tmp = new Mat (mImageGrab.rows(), mImageGrab.cols(), CvType.CV_8U, new Scalar(4));
@@ -333,36 +347,68 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
 //            }
 
             image.close();
-            processing();
+
         }
     };
+    @Override
+    public boolean onTouch(View view, MotionEvent event) {
 
-    private void processing() {
+<<<<<<< HEAD
+    private void processing(){
         //TODO:do processing
         // Get the features for tracking
-        if (mTargetLocked) {
-            if (mDrawing == Drawing.DRAWING) {
-                int minX = (int) ((float) Math.min(mPoints[0].x, mPoints[1].x) / mTrackingOverlay.getWidth() * mImageGrab.cols());
-                Log.e("sonuc", "+mImageGrab" + mImageGrab.cols());
-                int minY = (int) ((float) Math.min(mPoints[0].y, mPoints[1].y) / mTrackingOverlay.getHeight() * mImageGrab.rows());
-                int maxX = (int) ((float) Math.max(mPoints[0].x, mPoints[1].x) / mTrackingOverlay.getWidth() * mImageGrab.cols());
-                int maxY = (int) ((float) Math.max(mPoints[0].y, mPoints[1].y) / mTrackingOverlay.getHeight() * mImageGrab.rows());
+        if(mTargetLocked) {
+            if(mDrawing== Drawing.DRAWING) {
+                Log.d(TAG, ":target locked ");
 
-                mInitRectangle = new org.opencv.core.Rect2d(minX, minY, maxX - minX, maxY - minY);
+                int minX = (int)((float)(mPoints[0].x)/mTrackingOverlay.getWidth()*mImageGrab.cols());
+                int minY = (int)((float)(mPoints[0].y)/mTrackingOverlay.getHeight()*mImageGrab.rows());
+
+                mInitRectangle = new org.opencv.core.Rect2d(minX, minY, 20, 20);
+                Log.d(TAG, ":minx " + Integer.toString(minX) + " " + Integer.toString(minY) );
+
+
+=======
+        if (mTargetLocked) {
+
+                double cols = mRgba.cols();
+                double rows = mRgba.rows();
+
+                double xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
+                double yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
+
+
+
+
+
+                h[i] = (double)(event).getX() - xOffset;
+                k[i] = (double)(event).getY() - yOffset;
+
+                h[i]=x;
+                k[i]=y;
+
+                Log.i(TAG, "Touch image coordinates: (" + h[i] + ", " + k[i] + ")");
+
+
+                i++;
+
+
+                mInitRectangle = new org.opencv.core.Rect2d((int) (x-100), (int) (y-100), (int) (x+100), (int) (y+100));
+>>>>>>> 048d654d15caa23e23c7445d302462a412631c78
                 mImageGrabInit = new Mat();
                 mImageGrab.copyTo(mImageGrabInit);
 
-                if (mSelectedTracker.equals("TrackerMedianFlow")) {
+                if(mSelectedTracker.equals("TrackerMedianFlow")) {
                     mTracker = TrackerMedianFlow.create();
-                } else if (mSelectedTracker.equals("TrackerCSRT")) {
+                }else if(mSelectedTracker.equals("TrackerCSRT")) {
                     mTracker = TrackerCSRT.create();
-                } else if (mSelectedTracker.equals("TrackerKCF")) {
+                }else if(mSelectedTracker.equals("TrackerKCF")) {
                     mTracker = TrackerKCF.create();
-                } else if (mSelectedTracker.equals("TrackerMOSSE")) {
+                }else if(mSelectedTracker.equals("TrackerMOSSE")) {
                     mTracker = TrackerMOSSE.create();
-                } else if (mSelectedTracker.equals("TrackerTLD")) {
+                }else if(mSelectedTracker.equals("TrackerTLD")) {
                     mTracker = TrackerTLD.create();
-                } else if (mSelectedTracker.equals("TrackerMIL")) {
+                }else if(mSelectedTracker.equals("TrackerMIL")) {
                     mTracker = TrackerMIL.create();
                 }
 
@@ -370,20 +416,30 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                 mDrawing = Drawing.TRACKING;
 
                 //TODO: DEBUG
-                org.opencv.core.Rect testRect = new org.opencv.core.Rect(minX, minY, maxX - minX, maxY - minY);
+<<<<<<< HEAD
+                org.opencv.core.Rect testRect = new org.opencv.core.Rect(minX, minY, 20, 20);
+=======
+                org.opencv.core.Rect testRect = new org.opencv.core.Rect((int) (x-100), (int) (y-100), (int) (x+100), (int) (y+100));
+>>>>>>> 048d654d15caa23e23c7445d302462a412631c78
                 Mat roi = new Mat(mImageGrab, testRect);
                 Bitmap bmp = null;
-                Mat tmp = new Mat(roi.rows(), roi.cols(), CvType.CV_8U, new Scalar(4));
+                Mat tmp = new Mat (roi.rows(), roi.cols(), CvType.CV_8U, new Scalar(4));
                 try {
                     Imgproc.cvtColor(roi, tmp, Imgproc.COLOR_RGB2BGRA);
                     bmp = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888);
                     Utils.matToBitmap(tmp, bmp);
-                } catch (CvException e) {
-                    Log.d("Exception", e.getMessage());
+                }
+                catch (CvException e){
+                    Log.d("Exception",e.getMessage());
                 }
 
-            } else {
-                org.opencv.core.Rect2d trackingRectangle = new org.opencv.core.Rect2d(0, 0, 1, 1);
+<<<<<<< HEAD
+            }else{
+                org.opencv.core.Rect2d trackingRectangle = new org.opencv.core.Rect2d(0, 0, 1,1);
+=======
+
+                org.opencv.core.Rect2d trackingRectangle = new org.opencv.core.Rect2d((int) (x-100), (int) (y-100), (int) (x+100), (int) (y+100));
+>>>>>>> 048d654d15caa23e23c7445d302462a412631c78
                 mTracker.update(mImageGrab, trackingRectangle);
 
 //                //TODO: DEBUG
@@ -405,28 +461,44 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
 //                    mDrawing = Drawing.DRAWING;
 //                }
 
-                mPoints[0].x = (int) (trackingRectangle.x * (float) mTrackingOverlay.getWidth() / (float) mImageGrab.cols());
-                mPoints[0].y = (int) (trackingRectangle.y * (float) mTrackingOverlay.getHeight() / (float) mImageGrab.rows());
-                mPoints[1].x = mPoints[0].x + (int) (trackingRectangle.width * (float) mTrackingOverlay.getWidth() / (float) mImageGrab.cols());
-                mPoints[1].y = mPoints[0].y + (int) (trackingRectangle.height * (float) mTrackingOverlay.getHeight() / (float) mImageGrab.rows());
+                mPoints[0].x = (int)(trackingRectangle.x*(float)mTrackingOverlay.getWidth()/(float)mImageGrab.cols());
+                mPoints[0].y = (int)(trackingRectangle.y*(float)mTrackingOverlay.getHeight()/(float)mImageGrab.rows());
+                mPoints[1].x = mPoints[0].x+ (int)(trackingRectangle.width*(float)mTrackingOverlay.getWidth()/(float)mImageGrab.cols());
+                mPoints[1].y = mPoints[0].y +(int)(trackingRectangle.height*(float)mTrackingOverlay.getHeight()/(float)mImageGrab.rows());
+
+                Log.d(TAG, ":mp " + Integer.toString(mPoints[0].x) + "mp " + Integer.toString(mPoints[0].y) );
+
 
                 mTrackingOverlay.postInvalidate();
-                if (connected == Connected.True) {
+                if(connected == Connected.True) {
                     String dataBle = Integer.toString((mPoints[0].x + mPoints[1].x) / 2) + "," +
                             Integer.toString(mTrackingOverlay.getWidth()) + "," +
                             Integer.toString((mPoints[0].y + mPoints[1].y) / 2) + "," +
                             Integer.toString(mTrackingOverlay.getHeight());
                     sendBLE(dataBle);
+
                 }
+<<<<<<< HEAD
             }
+        }else{
+=======
+
         } else {
+>>>>>>> 048d654d15caa23e23c7445d302462a412631c78
             if (mTracker != null) {
                 mTracker.clear();
                 mTracker = null;
             }
         }
         mProcessing = false;
+
+
+
+
+        return false;// don't need subsequent touch events
+
     }
+
 
     protected void createCameraPreview() {
         try {
@@ -441,7 +513,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             imageReader.setOnImageAvailableListener(onImageAvailableListener, mBackgroundHandler);
             previewRequestBuilder.addTarget(imageReader.getSurface());
 
-            cameraDevice.createCaptureSession(Arrays.asList(surface, imageReader.getSurface()), new CameraCaptureSession.StateCallback() {
+            cameraDevice.createCaptureSession(Arrays.asList(surface, imageReader.getSurface()), new CameraCaptureSession.StateCallback(){
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
                     //The camera is already closed
@@ -465,15 +537,14 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                         e.printStackTrace();
                     }
                 }
-
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
                     Toast.makeText(getActivity(), "Configuration change", Toast.LENGTH_SHORT).show();
                 }
             }, null);
 
-            for (int i = 0; i < mPoints.length; i++) {
-                mPoints[i] = new Point(0, 0);
+            for (int i=0; i<mPoints.length;i++){
+                mPoints[i] = new Point(0,0);
             }
 
 
@@ -481,102 +552,38 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
                     new OverlayView.DrawCallback() {
                         @Override
                         public void drawCallback(Canvas canvas) {
-                            if (mDrawing != Drawing.CLEAR) {
+                            if(mDrawing != com.p4f.objecttracking.CameraFragment.Drawing.CLEAR) {
                                 Paint paint = new Paint();
                                 paint.setColor(Color.rgb(0, 0, 255));
                                 paint.setStrokeWidth(10);
                                 paint.setStyle(Paint.Style.STROKE);
-                                canvas.drawRect(10, 10, 300, 300, paint);
-                                if (mDrawing == Drawing.TRACKING && mShowCordinate == true) {
-                                    paint.setColor(Color.rgb(0, 255, 0));
-                                    canvas.drawLine((mPoints[0].x + mPoints[1].x) / 2,
-                                            0,
-                                            (mPoints[0].x + mPoints[1].x) / 2,
-                                            mTrackingOverlay.getHeight(),
-                                            paint);
-                                    canvas.drawLine(0,
-                                            (mPoints[0].y + mPoints[1].y) / 2,
-                                            mTrackingOverlay.getWidth(),
-                                            (mPoints[0].y + mPoints[1].y) / 2,
-                                            paint);
-                                    paint.setColor(Color.YELLOW);
-                                    paint.setStrokeWidth(2);
-                                    paint.setStyle(Paint.Style.FILL);
-                                    paint.setTextSize(30);
-                                    String strX = Integer.toString((mPoints[0].x + mPoints[1].x) / 2) + "/" + Integer.toString(mTrackingOverlay.getWidth());
-                                    String strY = Integer.toString((mPoints[0].y + mPoints[1].y) / 2) + "/" + Integer.toString(mTrackingOverlay.getHeight());
-                                    canvas.drawText(strX, (mPoints[0].x + mPoints[1].x) / 4, (mPoints[0].y + mPoints[1].y) / 2 - 10, paint);
-                                    canvas.save();
-                                    canvas.rotate(90, (mPoints[0].x + mPoints[1].x) / 2 + 10, (mPoints[0].y + mPoints[1].y) / 4);
-                                    canvas.drawText(strY, (mPoints[0].x + mPoints[1].x) / 2 + 10, (mPoints[0].y + mPoints[1].y) / 4, paint);
-                                    canvas.restore();
-                                }
-                            } else {
-
+                                canvas.drawCircle(mPoints[0].x, mPoints[0].y, 100, paint);
                             }
                         }
                     }
             );
+
             mTrackingOverlay.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View view, MotionEvent event) {
                     final int X = (int) event.getX();
                     final int Y = (int) event.getY();
-                    Log.d(TAG, ": " + Integer.toString(X) + " " + Integer.toString(Y));
+                    Log.d(TAG, ": " + Integer.toString(X) + " " + Integer.toString(Y) );
                     switch (event.getAction() & MotionEvent.ACTION_MASK) {
-                        case MotionEvent.ACTION_UP:
-//                            Log.d(TAG, ": " +  "MotionEvent.ACTION_UP" );
-                            if (!mTargetLocked) {
-                                mDrawing = Drawing.CLEAR;
-                                mTrackingOverlay.postInvalidate();
-                            }
-                            break;
-                        case MotionEvent.ACTION_POINTER_DOWN:
-//                            Log.d(TAG, ": " +  "MotionEvent.ACTION_POINTER_DOWN" );
-                            if (mTargetLocked == false) {
-                                if ((mPoints[0].x - mPoints[1].x != 0) && (mPoints[0].y - mPoints[1].y != 0)) {
-                                    mTargetLocked = true;
-                                    Toast toast = Toast.makeText(getActivity(), "Target is LOCKED !", Toast.LENGTH_LONG);
-                                    toast.setGravity(Gravity.TOP | Gravity.CENTER, 0, 0);
-                                    toast.show();
-                                } else {
-                                    mTargetLocked = false;
-                                }
-                            } else {
-                                mTargetLocked = false;
-                                Toast toast = Toast.makeText(getActivity(), "Target is UNLOCKED !", Toast.LENGTH_LONG);
-                                toast.setGravity(Gravity.TOP | Gravity.CENTER, 0, 0);
-                                toast.show();
-                            }
-                            mDrawing = Drawing.DRAWING;
-                            mTrackingOverlay.postInvalidate();
-                            break;
-                        case MotionEvent.ACTION_POINTER_UP:
-//                            Log.d(TAG, ": " +  "MotionEvent.ACTION_POINTER_UP" );
-                            break;
                         case MotionEvent.ACTION_DOWN:
 //                            Log.d(TAG, ": " +  "MotionEvent.ACTION_DOWN" );
-                            if (!mTargetLocked) {
-                                mDrawing = Drawing.DRAWING;
-                                mPoints[0].x = X;
-                                mPoints[0].y = Y;
-                                mPoints[1].x = X;
-                                mPoints[1].y = Y;
-                                mTrackingOverlay.postInvalidate();
-                            }
+                            mTargetLocked=true;
+                            //mDrawing = com.p4f.objecttracking.CameraFragment.Drawing.DRAWING;
+                            mDrawing = Drawing.DRAWING;
+                            mPoints[0].x = X;
+                            mPoints[0].y = Y;
+                            mTrackingOverlay.postInvalidate();
                             break;
-                        case MotionEvent.ACTION_MOVE:
-//                            Log.d(TAG, ": " +  "MotionEvent.ACTION_MOVE" );
-                            if (!mTargetLocked) {
-                                mPoints[1].x = X;
-                                mPoints[1].y = Y;
-                                mTrackingOverlay.postInvalidate();
-                            }
-                            break;
+
                     }
-                    if (mTargetLocked == true) {
+                    if(mTargetLocked==true){
                         mMenu.getItem(2).setEnabled(false);
-                    } else {
+                    }else{
                         mMenu.getItem(2).setEnabled(true);
                     }
                     return true;
@@ -648,26 +655,16 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
      */
 
     private void status(String str) {
-        mMenu.getItem(3).setTitle("BLE " + str);
+        mMenu.getItem(3).setTitle("BLE "+str);
     }
 
     private void connectBLE() {
         try {
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             BluetoothDevice device = bluetoothAdapter.getRemoteDevice(mBluetoothDevAddr);
-            if (ActivityCompat.checkSelfPermission(requireActivity(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                return;
-            }
             String deviceName = device.getName() != null ? device.getName() : device.getAddress();
             status("connecting...");
-            connected = Connected.Pending;
+            connected = com.p4f.objecttracking.CameraFragment.Connected.Pending;
             socket = new SerialSocket();
             service.connect(this, "Connected to " + deviceName);
             socket.connect(getContext(), service, device);
@@ -677,14 +674,14 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     }
 
     private void disconnectBLE() {
-        connected = Connected.False;
+        connected = com.p4f.objecttracking.CameraFragment.Connected.False;
         service.disconnect();
         socket.disconnect();
         socket = null;
     }
 
     private void sendBLE(String str) {
-        if(connected != Connected.True) {
+        if(connected != com.p4f.objecttracking.CameraFragment.Connected.True) {
             Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -741,13 +738,13 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
         int id = item.getItemId();
         if (id == R.id.ble_setup) {
             closeCamera();
-            if (connected != Connected.False)
+            if (connected != com.p4f.objecttracking.CameraFragment.Connected.False)
                 disconnectBLE();
             Bundle args = new Bundle();
             args.putString("device", mBluetoothDevAddr);
             Fragment fragment = new DevicesFragment();
             fragment.setArguments(args);
-            fragment.setTargetFragment(CameraFragment.this, REQUEST_CONNECT_CODE);
+            fragment.setTargetFragment(com.p4f.objecttracking.CameraFragment.this, REQUEST_CONNECT_CODE);
             getFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "devices").addToBackStack(null).commit();
             return true;
         } else if(id == R.id.camera_cordinate){
@@ -757,11 +754,11 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             showCooridinate.setText("Show coordinate");
             showCooridinate.setChecked(mShowCordinate);
             showCooridinate.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton buttonView,boolean isChecked) {
-                        mShowCordinate = isChecked;
-                    }
-                }
+                                                           @Override
+                                                           public void onCheckedChanged(CompoundButton buttonView,boolean isChecked) {
+                                                               mShowCordinate = isChecked;
+                                                           }
+                                                       }
             );
 
             LinearLayout lay = new LinearLayout(getActivity());
@@ -873,7 +870,7 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     @Override
     public void onSerialConnect() {
         status("connected");
-        connected = Connected.True;
+        connected = com.p4f.objecttracking.CameraFragment.Connected.True;
     }
 
     @Override
