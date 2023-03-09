@@ -1,16 +1,18 @@
 package com.p4f.objecttracking;
 
+import static android.app.Activity.RESULT_CANCELED;
+import static android.app.Activity.RESULT_OK;
+
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.content.ComponentName;
+import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -28,16 +30,13 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.IBinder;
 //import android.text.Spannable;
 //import android.text.SpannableStringBuilder;
 //import android.text.style.ForegroundColorSpan;
-import android.text.Spannable;
-import android.text.SpannableStringBuilder;
-import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -51,9 +50,12 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -80,12 +82,16 @@ import org.opencv.tracking.TrackerMOSSE;
 import org.opencv.tracking.TrackerMedianFlow;
 import org.opencv.tracking.TrackerTLD;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-public class CameraFragment extends Fragment implements ServiceConnection, SerialListener {
+public class CameraFragment extends Fragment implements IOnBackPressed  {
 
     final String TAG = "CameraFragment";
 
@@ -144,6 +150,22 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     private String mSelectedTracker = "TrackerMedianFlow";
 
 
+    BluetoothAdapter myBluetoothAdapter;
+    Intent btEnablingIntent;
+    int requestCodeForeEnable;
+
+    BluetoothDevice[] btArray;
+    ListView pairedlist;
+    String address;
+    BluetoothSocket btSocket = null;
+
+    private boolean isBtConnected = false;
+
+    private ProgressDialog progress;
+
+    private Set<BluetoothDevice> pairedDevice;
+    private static final String APP_NAME = "STARMAP";
+    private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
@@ -176,6 +198,8 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
         setHasOptionsMenu(true);
     }
 
@@ -240,6 +264,14 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
         mTrackingOverlay = (OverlayView)view.findViewById(R.id.tracking_overlay);
         assert ( mTextureView != null && mTrackingOverlay !=null) ;
         mTextureView.setSurfaceTextureListener(textureListener);
+
+
+        myBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+
+        btEnablingIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+        requestCodeForeEnable = 1;
+        pairedlist = view.findViewById(R.id.listview2);
         return view;
     }
 
@@ -591,10 +623,8 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             status("connecting...");
             connected = com.p4f.objecttracking.CameraFragment.Connected.Pending;
             socket = new SerialSocket();
-            service.connect(this, "Connected to " + deviceName);
-            socket.connect(getContext(), service, device);
+
         } catch (Exception e) {
-            onSerialConnectError(e);
         }
     }
 
@@ -614,63 +644,30 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             byte[] data = (str + newline).getBytes();
             socket.write(data);
         } catch (Exception e) {
-            onSerialIoError(e);
+
         }
     }
 
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        if(service != null)
-            service.attach(this);
-        else
-            getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
-    }
 
-    @Override
-    public void onStop() {
-        if(service != null && !getActivity().isChangingConfigurations())
-            service.detach();
-        super.onStop();
-    }
 
-    @SuppressWarnings("deprecation") // onAttach(context) was added with API 23. onAttach(activity) works for all API versions
-    @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-        getActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
-    }
-
-    @Override
-    public void onDetach() {
-        try { getActivity().unbindService(this); } catch(Exception ignored) {}
-        super.onDetach();
-    }
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         inflater.inflate(R.layout.menu_camera, menu);
         mMenu = menu;
         mMenu.getItem(3).setEnabled(false);
-        if(mBluetoothDevAddr.equals("") == false && service != null) {
-            getActivity().runOnUiThread(this::connectBLE);
-        }
+
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.ble_setup) {
-            closeCamera();
-            if (connected != com.p4f.objecttracking.CameraFragment.Connected.False)
-                disconnectBLE();
-            Bundle args = new Bundle();
-            args.putString("device", mBluetoothDevAddr);
-            Fragment fragment = new DevicesFragment();
-            fragment.setArguments(args);
-            fragment.setTargetFragment(com.p4f.objecttracking.CameraFragment.this, REQUEST_CONNECT_CODE);
-            getFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "devices").addToBackStack(null).commit();
+
+
+
+
             return true;
         } else if(id == R.id.camera_cordinate){
             AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
@@ -769,51 +766,157 @@ public class CameraFragment extends Fragment implements ServiceConnection, Seria
             Dialog dialog = builder.show();
 
             return true;
-        }
-        else {
+        } else if (id == R.id.blue) {
+            success_blue();
+            return true;
+        } else if (id == R.id.ble) {
+listDevice();
+            return true;
+        } else {
             return super.onOptionsItemSelected(item);
         }
     }
+    void success_blue() {
+        if (myBluetoothAdapter == null) {
+            Toast.makeText(requireActivity(), "Bluetooth does not support", Toast.LENGTH_LONG).show();
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode== REQUEST_CONNECT_CODE && resultCode== Activity.RESULT_OK) {
-            mBluetoothDevAddr = data.getStringExtra("bluetooth device");
+
+        } else {
+
+            if (!myBluetoothAdapter.isEnabled()) {
+
+                startActivityForResult(btEnablingIntent, requestCodeForeEnable);
+
+            }
+
         }
     }
 
-    @Override
-    public void onServiceConnected(ComponentName name, IBinder binder) {
-        service = ((SerialService.SerialBinder) binder).getService();
-    }
 
-    @Override
-    public void onServiceDisconnected(ComponentName name) {
-        service = null;
-    }
+    private void listDevice() {
 
-    @Override
-    public void onSerialConnect() {
-        status("connected");
-        connected = com.p4f.objecttracking.CameraFragment.Connected.True;
-    }
+        pairedDevice = myBluetoothAdapter.getBondedDevices();
 
-    @Override
-    public void onSerialConnectError(Exception e) {
-//        status("connection failed: " + e.getMessage());
-        status("connection failed");
-        disconnectBLE();
-    }
 
-    @Override
-    public void onSerialRead(byte[] data) {
+        ArrayList list = new ArrayList();
+        if (pairedDevice.size() > 0) {
+            for (BluetoothDevice bt : pairedDevice) {
+                list.add(bt.getName() + "\n" + bt.getAddress());
+
+
+            }
+
+
+        } else {
+            Toast.makeText(requireActivity(), "Eşleşmiş cihaz yok", Toast.LENGTH_SHORT).show();
+        }
+
+        final ArrayAdapter adapter = new ArrayAdapter(requireActivity(), android.R.layout.simple_list_item_1, list);
+        pairedlist.setAdapter(adapter);
+        pairedlist.setOnItemClickListener(cihazSec);
+
 
     }
 
-    @Override
-    public void onSerialIoError(Exception e) {
-//        status("connection lost: " + e.getMessage());
-        status("connection lost");
-        disconnectBLE();
+    public AdapterView.OnItemClickListener cihazSec = new AdapterView.OnItemClickListener() {
+
+        @Override
+        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+
+            String info = ((TextView) view).getText().toString();
+            address = info.substring(info.length() - 17);
+            //Yeni bir Activity baslatman icin bir intent tanımlıyoruz
+            Toast.makeText(requireActivity(), "adress" + address, Toast.LENGTH_SHORT).show();
+            new CameraFragment.BTbaglan().execute();
+        }
+    };
+
+    private void Disconnect() {
+        if (btSocket != null) {
+            try {
+                btSocket.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
+
+    @Override
+    public boolean onBackPressed() {
+        Disconnect();
+        return false;
+    }
+
+
+    private class BTbaglan extends AsyncTask<Void, Void, Void> {
+        private boolean ConnectSuccess = true;
+
+        @Override
+        protected void onPreExecute() {
+            progress = ProgressDialog.show(requireActivity(), "Bağlanıyor..", "Lütfen Bekleyin");
+        }
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            try {
+                if (btSocket == null || !isBtConnected) {
+                    myBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                    BluetoothDevice cihaz = myBluetoothAdapter.getRemoteDevice(address);
+
+
+                    btSocket = cihaz.createRfcommSocketToServiceRecord(MY_UUID);
+                    BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
+                    btSocket.connect();
+
+
+
+                }
+            }
+            catch (IOException e){
+                ConnectSuccess =false;
+
+            }
+
+
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void unused) {
+            super.onPostExecute(unused);
+            if(!ConnectSuccess){
+                Toast.makeText(requireActivity(), "Bağlantı hatası", Toast.LENGTH_SHORT).show();
+
+            }else{
+                Toast.makeText(requireActivity(), "Bağlantı başarılı", Toast.LENGTH_SHORT).show();
+                isBtConnected = true;
+            }
+            progress.dismiss();
+        }
+    }
+
+
+
+
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(resultCode == requestCodeForeEnable){
+            if(resultCode == RESULT_OK){
+                Toast.makeText(requireActivity(),"Bluetooth is enable",Toast.LENGTH_LONG).show();
+
+
+            }else if(resultCode == RESULT_CANCELED){
+                Toast.makeText(requireActivity(),"Bluetooth Enabling Cancelled",Toast.LENGTH_LONG).show();
+
+            }
+        }
+    }
+
+
+
+
 }

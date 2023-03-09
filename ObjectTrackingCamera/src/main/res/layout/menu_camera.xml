@@ -13,5 +13,17 @@
     <item
         android:id="@+id/ble_status"
         android:title="BLE not connect"
-        app:showAsAction="always" />
+         />
+    <item
+        android:id="@+id/blue"
+        android:title="Bluetooth"
+        android:icon="@drawable/bluetooth"
+        app:showAsAction="always"
+        />
+    <item
+        android:id="@+id/ble"
+        android:title="List Device"
+        android:icon="@drawable/list"
+        app:showAsAction="always"
+        />
 </menu>
