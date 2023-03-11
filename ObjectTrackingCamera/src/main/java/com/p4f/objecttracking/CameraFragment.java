@@ -445,7 +445,7 @@ public class CameraFragment extends Fragment implements IOnBackPressed  {
                             Integer.toString(mTrackingOverlay.getWidth()) + "," +
                             Integer.toString((mPoints[0].y + mPoints[1].y) / 2) + "," +
                             Integer.toString(mTrackingOverlay.getHeight());
-                    sendBLE(dataBle);
+                 sendSignal(dataBle);
 
                 }
             }
@@ -899,7 +899,17 @@ listDevice();
     }
 
 
+    private void sendSignal ( String number ) {
+        if ( btSocket != null ) {
+            try {
+                btSocket.getOutputStream().write(number.toString().getBytes());
 
+                Toast.makeText(requireActivity(), "Başarılı data ", Toast.LENGTH_SHORT).show();
+            } catch (IOException e) {
+                Toast.makeText(requireActivity(), "Başarısız data ", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
 
 
     @Override
