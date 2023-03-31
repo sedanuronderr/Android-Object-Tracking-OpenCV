@@ -444,7 +444,7 @@ public class CameraFragment extends Fragment implements IOnBackPressed  {
                     String dataBle = Integer.toString((mPoints[0].x + mPoints[1].x) / 2) + "," +
                             Integer.toString(mTrackingOverlay.getWidth()) + "," +
                             Integer.toString((mPoints[0].y + mPoints[1].y) / 2) + "," +
-                            Integer.toString(mTrackingOverlay.getHeight());
+                            Integer.toString(mTrackingOverlay.getHeight()) + "x";
                  sendSignal(dataBle);
 
                 }
